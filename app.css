@@ -146,3 +146,4 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--mut);font-size:12.5px}
   .kpi .v{font-size:19px}
   input,select,textarea{font-size:16px} /* iOS không tự phóng to khi gõ */
 }
+.task .meta.pre{white-space:pre-wrap;display:block}

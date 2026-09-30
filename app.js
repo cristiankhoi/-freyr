@@ -64,7 +64,7 @@ const I18N = {
     course: 'Môn', upcoming: 'Hạn sắp tới (3 tuần)', exam_plan: 'Lịch ôn tự sinh', save_exams: 'Lưu ngày thi', add_row: 'Thêm dòng',
     exam_hint: 'Nhập ngày thi, máy tự tạo buổi ôn trước 21 / 14 / 7 / 3 / 1 ngày và tự chuyển phương án giờ B khi còn 28 ngày.',
     search: 'Tìm', search_ph: 'Tìm theo tên, ghi chú...', results: 'kết quả', k_card: 'Thẻ duyệt', k_task: 'Việc', k_review: 'Review',
-    wp_missing: 'Chưa có tài khoản freyr-bot: phương án đăng bài sẽ báo "chưa làm được".', kpi_missing: 'Số liệu GA4/từ khóa: Claude cập nhật ở phiên làm việc.'
+    study_sessions: 'Lịch học hôm nay và sắp tới', study_notes: 'Tài liệu và prompt học', wp_missing: 'Chưa có tài khoản freyr-bot: phương án đăng bài sẽ báo "chưa làm được".', kpi_missing: 'Số liệu GA4/từ khóa: Claude cập nhật ở phiên làm việc.'
   },
   en: {
     today: 'Today', decisions: 'Decisions', review: 'To review', progress: 'Progress', daily: 'Daily report',
@@ -127,7 +127,7 @@ const I18N = {
     course: 'Course', upcoming: 'Upcoming deadlines (3 weeks)', exam_plan: 'Auto revision plan', save_exams: 'Save exam dates', add_row: 'Add row',
     exam_hint: 'Enter exam dates; revision sessions are created 21 / 14 / 7 / 3 / 1 days before, and the hour plan switches to B at 28 days.',
     search: 'Search', search_ph: 'Search title, notes...', results: 'results', k_card: 'Card', k_task: 'Task', k_review: 'Review',
-    wp_missing: 'No freyr-bot account yet: publishing options will report "blocked".', kpi_missing: 'GA4/keyword numbers: Claude fills them in during a session.'
+    study_sessions: 'Study sessions today and upcoming', study_notes: 'Study materials and prompts', wp_missing: 'No freyr-bot account yet: publishing options will report "blocked".', kpi_missing: 'GA4/keyword numbers: Claude fills them in during a session.'
   }
 };
 
@@ -172,16 +172,31 @@ const $ = sel => document.querySelector(sel);
 // Link Web app không phải bí mật (thiếu mã thì máy chủ trả "unauthorized").
 const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbyEnSC746m38w62XzM53FWO2uGkaOozSqlN5baZ8l0WYI0qreqmYyPD3WDfwBzBi8rA/exec';
 const Api = {
+  // Google đôi khi trả lời sai (lỗi 404 ở bước chuyển hướng, hoặc biến yêu cầu gửi thành "mở trang" -> {name:'Freyr API'},
+  // nghĩa là máy chủ chưa chạy lệnh): khi đó gửi lại, tối đa 3 lần.
   async post(body) {
     if (S.cfg.demo) return Demo.handle(body);
-    const res = await fetch(S.cfg.url, {
-      method: 'POST', redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(Object.assign({ token: S.cfg.token }, body))
-    });
-    const j = await res.json();
-    if (!j.ok) throw new Error(j.error === 'unauthorized' ? t('err_unauth') : j.error);
-    return j;
+    let last;
+    for (let i = 0; i < 3; i++) {
+      try {
+        const res = await fetch(S.cfg.url, {
+          method: 'POST', redirect: 'follow',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(Object.assign({ token: S.cfg.token }, body))
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const j = await res.json();
+        if (j.name === 'Freyr API') throw new Error('redirect');
+        if (body.action === 'data' && !(j.data || j).tasks) throw new Error('bad_data');
+        if (!j.ok) throw new Error(j.error === 'unauthorized' ? t('err_unauth') : j.error);
+        return j;
+      } catch (e) {
+        last = e;
+        if (!/HTTP|redirect|bad_data|JSON|Unexpected token/i.test(e.message)) throw e;
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+    throw new Error('Failed to fetch (' + last.message + ')');
   }
 };
 
@@ -446,6 +461,12 @@ const UI = {
       if (seen[x.id] || x.area !== 'isolution' || x.source === 'routine' || x.source === 'calendar') return false;
       return (seen[x.id] = true);
     });
+  },
+  copyNote(id) {
+    const n = (S.data.notes || []).find(x => x.id === id); if (!n) return;
+    const done = () => UI.toast(t('copied'));
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(n.body).then(done, () => UI.copyFallback(n.body, done));
+    else UI.copyFallback(n.body, done);
   },
   copyFallback(txt, done) {
     const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
@@ -835,7 +856,17 @@ const Pages = {
       <div id="examRows">${exRows}</div>
       <div class="actions" style="justify-content:flex-start"><button type="button" class="btn" onclick="document.getElementById('examRows').insertAdjacentHTML('beforeend', UI.examRow(${esc(JSON.stringify(names))}, {}))">+ ${t('add_row')}</button><button class="btn p">${t('save_exams')}</button></div></form>`;
     const plan = s.plan.length ? `<div class="group-h">${t('exam_plan')}</div><div class="card"><ul class="tasks">${s.plan.map(x => UI.taskRow(Object.assign({}, x, { start: x.date ? x.date.slice(5).split('-').reverse().join('/') : '' }), null)).join('')}</ul></div>` : '';
-    return `<div class="group-h" style="margin-top:0">${t('courses')}</div>${cards}
+    // buổi học đã xếp ngày (hôm nay + sắp tới), không kể lịch trên lớp và buổi ôn thi tự sinh
+    const seen = {}, sessions = d.tasks.concat(d.backlog || []).filter(x => x.area === 'study' && x.date && x.date >= d.today && x.source !== 'calendar' && x.source !== 'exam_plan' && x.status !== 'skip' && !seen[x.id] && (seen[x.id] = 1))
+      .sort((a, b) => (a.date + (a.start || '99')) < (b.date + (b.start || '99')) ? -1 : 1);
+    const sess = sessions.length ? `<div class="group-h">${t('study_sessions')}</div><div class="card"><ul class="tasks">${sessions.map(x => {
+      const r = UI.taskRow(Object.assign({}, x, { start: (x.date === d.today ? '' : x.date.slice(8, 10) + '/' + x.date.slice(5, 7) + ' ') + (x.start || '') }), null);
+      return r.replace('<div class="meta">', '<div class="meta pre">');
+    }).join('')}</ul></div>` : '';
+    const notes = (d.notes || []).filter(n => n.type === 'study');
+    const mats = notes.length ? `<div class="group-h">${t('study_notes')}</div><div class="card">${notes.map(n => `<details class="rule"><summary><b>${esc(n.group ? n.group + ' · ' : '')}${esc(n.title)}</b></summary>
+      <div class="actions" style="justify-content:flex-start;margin:6px 0"><button class="btn sm p" onclick="UI.copyNote('${esc(n.id)}')">📋 ${t('copy')}</button></div><pre class="reptxt">${esc(n.body)}</pre></details>`).join('')}</div>` : '';
+    return `${sess}${mats}<div class="group-h"${sess || mats ? '' : ' style="margin-top:0"'}>${t('courses')}</div>${cards}
       <div class="split"><div><div class="group-h" style="margin-top:0">${t('upcoming')}</div><div class="card">${up}</div>${plan}</div><div>${exams}</div></div>`;
   },
 
