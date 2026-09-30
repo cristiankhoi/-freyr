@@ -93,6 +93,34 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--mut);font-size:12.5px}
 @media(min-width:761px){.modal{align-items:center}.modal .box{border-radius:16px}}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+/* thẻ chờ duyệt */
+#nav a b.warn{background:var(--red)}
+.pills{display:flex;gap:5px;flex-wrap:wrap;margin:5px 0}
+.pills .pill{cursor:default}
+.tier-T1{background:var(--oks);color:var(--ok)}.tier-T3{background:var(--accs);color:var(--acc)}.tier-PC{background:var(--warns);color:var(--warn)}
+.ex-done{background:var(--oks);color:var(--ok)}.ex-pending,.ex-waiting_claude,.ex-waiting_pc{background:var(--warns);color:var(--warn)}.ex-failed,.ex-blocked{background:var(--reds);color:var(--red)}
+.sbar{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 10px;margin:8px 0;font-size:13px}
+.sbar dt{color:var(--mut);font-weight:600}.sbar dd{margin:0;white-space:pre-wrap}
+.gloss{margin:6px 0 0;padding-left:18px;font-size:13px}.gloss li{margin:4px 0}
+.qa{border-top:1px dashed var(--line);margin-top:8px;padding-top:6px;font-size:13px}
+.ans{background:var(--accs);border-radius:8px;padding:6px 10px;margin-top:4px;font-size:13px}
+.askbox{margin-top:10px}
+/* báo cáo, biểu đồ */
+.reptxt{white-space:pre-wrap;font:13px/1.55 inherit;font-family:inherit;margin:0;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.rep{margin-bottom:10px}.rep summary{list-style:none;cursor:pointer;margin:0}.rep summary::-webkit-details-marker{display:none}
+.chart{width:100%;height:auto;max-height:250px;display:block;margin-top:6px}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .ax{fill:var(--mut);font-size:11px}
+.chart .val{fill:var(--txt);font-size:11px;font-weight:600}
+.chart rect:hover{opacity:.8}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.tbl{border-collapse:collapse;font-size:12.5px;margin-top:6px;min-width:100%}.tbl td,.tbl th{border-bottom:1px solid var(--line);padding:4px 8px;text-align:right;white-space:nowrap}.tbl td:first-child,.tbl th:first-child{text-align:left}
+.inslist{list-style:none;margin:0;padding:0}.ins{padding:8px 0;border-bottom:1px solid var(--line)}.ins:last-child{border-bottom:0}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.exrow{margin-bottom:6px}
+.form.iso{grid-template-columns:minmax(0,1fr) 150px 190px 70px 90px auto}
+.form.arch{grid-template-columns:minmax(0,1fr) auto}
 /* mobile */
 @media(max-width:760px){
   #nav{position:fixed;left:0;top:0;z-index:30;transform:translateX(-105%);transition:transform .2s;box-shadow:0 0 30px rgba(0,0,0,.2)}
@@ -108,6 +136,11 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--mut);font-size:12.5px}
   .split > .side-col{order:-1}
   .form{grid-template-columns:repeat(2,minmax(0,1fr))}
   .form input[name=title]{grid-column:1/-1}
+  .form.iso{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .form.arch{grid-template-columns:minmax(0,1fr) auto}
+  .form.arch input[name=q]{grid-column:auto}
+  .grid3{grid-template-columns:minmax(0,1fr)}
+  .sbar{grid-template-columns:minmax(0,1fr)}.sbar dd{margin-bottom:4px}
   .task{grid-template-columns:44px minmax(0,1fr) auto;padding:9px 10px}
   #syncState{display:none}
   .kpi .v{font-size:19px}
