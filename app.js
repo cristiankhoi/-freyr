@@ -121,6 +121,8 @@ function addDay(d, n) { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate
 const $ = sel => document.querySelector(sel);
 
 /* ---------------- gọi máy chủ ---------------- */
+// Link Web app không phải bí mật (thiếu mã thì máy chủ trả "unauthorized").
+const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbyEnSC746m38w62XzM53FWO2uGkaOozSqlN5baZ8l0WYI0qreqmYyPD3WDfwBzBi8rA/exec';
 const Api = {
   async post(body) {
     if (S.cfg.demo) return Demo.handle(body);
@@ -301,7 +303,8 @@ const App = {
   /* ---- cài đặt ---- */
   connect(form) {
     const f = new FormData(form);
-    S.cfg = { url: (f.get('url') || '').trim(), token: (f.get('token') || '').trim(), demo: false };
+    // Trình duyệt tự điền mật khẩu có thể xoá ô link (nó coi ô link là "tên đăng nhập"): trống thì dùng link mặc định.
+    S.cfg = { url: (f.get('url') || '').trim() || DEFAULT_URL, token: (f.get('token') || '').trim(), demo: false };
     LS.set('cfg', S.cfg); S.data = null; S.queue = []; LS.set('queue', []);
     App.refresh(true).then(() => { if (S.data) App.go('today'); });
     return false;
@@ -328,7 +331,7 @@ const UI = {
   toast(msg) { const el = $('#toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(UI._tt); UI._tt = setTimeout(() => el.classList.remove('on'), 2200); },
 
   counts() {
-    const d = S.data; if (!d) return {};
+    const d = S.data; if (!d || !d.tasks) return {};
     return {
       today: d.tasks.filter(x => x.status !== 'done' && x.status !== 'skip').length,
       decisions: d.decisions.filter(x => x.status !== 'decided').length,
