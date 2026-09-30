@@ -249,6 +249,8 @@ const App = {
   /** thay đổi: sửa ngay trên máy (optimistic), rồi gửi; mất mạng thì xếp hàng */
   async act(body, local) {
     if (local && S.data) { local(S.data); LS.set('data', S.data); UI.renderNav(); UI.render(); }
+    // mã riêng cho mỗi lệnh: gửi lại (mạng chập chờn) thì máy chủ không làm 2 lần
+    body.rid = body.rid || Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     S.queue.push(body); LS.set('queue', S.queue);
     await App.flush();
   },
@@ -279,8 +281,13 @@ const App = {
     const task = { title, minutes: Number(f.get('minutes') || 60), area: f.get('area') || 'isolution', priority: Number(f.get('priority') || 2), date: S.page === 'tasks' || S.page === 'isolog' ? '' : S.data.today };
     if (f.get('group')) task.group = f.get('group');
     if (f.get('due')) task.due = String(f.get('due')).replace('T', ' ');
+    if (f.get('date')) task.date = f.get('date');
+    if (f.get('start')) { task.start = f.get('start'); if (!task.date) task.date = S.data.today; }
     const tmp = Object.assign({ id: 'tmp' + Date.now(), start: '', status: 'todo', carried: 0, source: 'user', created: '' }, task);
-    App.act({ action: 'addTask', task }, d => { (task.date ? d.tasks : d.backlog).push(tmp); });
+    App.act({ action: 'addTask', task }, d => {
+      (task.date === d.today ? d.tasks : d.backlog).push(tmp);
+      d.tasks.sort((a, b) => (a.start || '99') < (b.start || '99') ? -1 : 1);
+    });
     form.reset();
     return false;
   },
@@ -627,6 +634,8 @@ const UI = {
   addForm() {
     return `<form class="form" onsubmit="return App.addTask(this)">
       <input name="title" placeholder="${t('title_ph')}" autocomplete="off">
+      <input name="date" type="date" title="${t('date')}" ${S.page === 'tasks' ? '' : `value="${S.data.today}"`}>
+      <input name="start" type="time" title="${t('start')}">
       <input name="minutes" type="number" min="5" step="5" value="60" title="${t('minutes')}">
       ${UI.areaSel('area', 'isolution')}${UI.prioSel(2)}
       <button class="btn p">${t('add')}</button></form>`;
@@ -962,7 +971,7 @@ const Demo = {
   handle(b) {
     if (!Demo.db) Demo.db = Demo.make();
     const d = Demo.db;
-    if (b.action === 'addTask') { const x = Object.assign({ id: 'D' + Date.now(), start: '', status: 'todo', carried: 0 }, b.task); (x.date ? d.tasks : d.backlog).push(x); }
+    if (b.action === 'addTask') { const x = Object.assign({ id: 'D' + Date.now(), start: '', status: 'todo', carried: 0 }, b.task); (x.date === d.today ? d.tasks : d.backlog).push(x); }
     if (b.action === 'updateTask') { const x = d.tasks.concat(d.backlog).find(y => y.id === b.id); if (x) { Object.assign(x, b.fields); App.relocate(d, x); } }
     if (b.action === 'deleteTask') { d.tasks = d.tasks.filter(y => y.id !== b.id); d.backlog = d.backlog.filter(y => y.id !== b.id); }
     if (b.action === 'chooseDecision') { const x = d.decisions.find(y => y.id === b.id), o = x.options.find(y => y.key === b.chosen) || {};

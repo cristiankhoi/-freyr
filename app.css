@@ -60,7 +60,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .task.is-star{background:color-mix(in srgb,#f59e0b 7%,var(--card))}
 .area-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
 /* forms */
-.form{display:grid;grid-template-columns:minmax(0,1fr) 80px 120px 100px auto;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--soft);border-radius:12px 12px 0 0}
+.form{display:grid;grid-template-columns:minmax(0,1fr) 140px 100px 70px 120px 90px auto;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--soft);border-radius:12px 12px 0 0}
 input,select,textarea{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 9px;width:100%;min-width:0}
 textarea{min-height:64px;resize:vertical}
 label.f{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}
