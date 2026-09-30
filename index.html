@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Freyr</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="theme-color" content="#4f46e5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Freyr">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app">
+  <aside id="nav"></aside>
+  <div id="scrim" onclick="UI.closeNav()"></div>
+  <div id="main">
+    <header id="top">
+      <button id="menuBtn" onclick="UI.openNav()" aria-label="Menu">☰</button>
+      <div class="ttl"><h1 id="pageTitle"></h1><span id="pageSub" class="mut"></span></div>
+      <div class="right">
+        <span id="syncState" class="mut"></span>
+        <button class="btn sm" onclick="App.refresh(true)" id="syncBtn">⟳</button>
+        <button class="btn sm" onclick="App.toggleLang()" id="langBtn">EN</button>
+      </div>
+    </header>
+    <main id="view"></main>
+  </div>
+</div>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
