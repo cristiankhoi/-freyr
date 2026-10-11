@@ -17,7 +17,7 @@ window.FreyrAiLive={
     if(this.key)this.poll(this.generation);else document.getElementById('aiCloudPair').open=true;
   },
   async poll(generation){
-    if(!this.key||generation!==this.generation||this.mode!=='live')return;
+    if(!this.key||generation!==this.generation||this.mode!=='live'||!document.getElementById('aiCloudStatus'))return;
     const status=document.getElementById('aiCloudStatus');
     const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),20000);
     try{
@@ -39,8 +39,8 @@ window.FreyrAiLive={
     const contents=document.getElementById('aiCloudContents');
     for(const [actor,label] of Object.entries(labels)){
       let card=document.getElementById('ai-cloud-'+actor);if(!card){card=document.createElement('section');card.className='card pad';card.id='ai-cloud-'+actor;const h=document.createElement('h3');h.textContent=label;card.append(h);const tag=document.createElement('p');tag.className='mut';card.append(tag);const pre=document.createElement('pre');pre.className='ai-cloud-text';card.append(pre);contents.append(card);}
-      const c=(s.contents||{})[actor];card.querySelector('p').textContent=c?(c.final?'Phản hồi đã kết thúc · vẫn cần kiểm tra nguồn':'Đang viết · chưa kiểm tra')+(c.truncated?' · giới hạn phần hiển thị 20.000 ký tự':''):'Chưa có phản hồi; công cụ có thể chỉ trả kết quả khi hoàn tất.';
-      const pre=card.querySelector('pre');if(pre.textContent!==(c?.text||''))pre.textContent=c?.text||'';
+      const c=(s.contents||{})[actor],a=s.artifacts||{},stored=actor==='codex-read'?a.news:actor==='codex-analysis'?a.analysis:actor==='agy-summary'?a.summary:null;card.querySelector('p').textContent=c?(c.final?'Phản hồi đã kết thúc · vẫn cần kiểm tra nguồn':'Đang viết · chưa kiểm tra')+(c.truncated?' · giới hạn phần hiển thị 20.000 ký tự':''):stored?'Kết quả đã lưu · không phải AI đang viết':'Chưa có phản hồi; công cụ có thể chỉ trả kết quả khi hoàn tất.';
+      const pre=card.querySelector('pre'),text=c?.text||(stored?JSON.stringify(stored,null,2):'');if(pre.textContent!==text)pre.textContent=text;
     }
     const saved=document.getElementById('aiCloudSaved'),text=JSON.stringify(s.artifacts||{},null,2);if(saved.textContent!==text)saved.textContent=text;
   }
