@@ -1,7 +1,7 @@
 // Lưu sẵn khung app để mở được khi mất mạng. Dữ liệu do app.js lưu riêng (localStorage).
 // Mỗi lần sửa app: tăng số phiên bản dưới đây để iPhone tải bản mới.
-const CACHE = 'freyr-v11-ai-live-relay';
-const FILES = ['./', 'index.html', 'app.css', 'app.js', 'ai-live.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];
+const CACHE = 'freyr-v12-tracey';
+const FILES = ['./', 'index.html', 'app.css', 'app.js', 'ai-live.js', 'tracey/tracey.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

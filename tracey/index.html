@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tracey Altios</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="theme-color" content="#0d9488">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tracey">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="app.css">
+<style>#main{max-width:860px;margin:0 auto}#top{padding-left:16px;padding-right:16px}#view{padding:12px 16px 40px}.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}.chip{cursor:pointer;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:5px 12px}.chip.on{background:var(--accs);color:var(--acc);border-color:var(--acc);font-weight:600}</style>
+</head>
+<body>
+<div id="app"><div id="main">
+  <header id="top"><div class="ttl"><h1>Tracey Altios</h1><span class="mut">Lịch việc & nhắc việc</span></div></header>
+  <main id="view"></main>
+</div></div>
+<div id="toast"></div>
+<script src="tracey.js"></script>
+<script>
+Tracey.mount(document.getElementById('view'));
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+</script>
+</body>
+</html>

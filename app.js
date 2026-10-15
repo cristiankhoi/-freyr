@@ -131,6 +131,7 @@ const I18N = {
   }
 };
 
+I18N.vi.tracey='Tracey Altios'; I18N.en.tracey='Tracey Altios'; I18N.vi.sub_tracey='Lịch việc chu kỳ tháng của chị (dữ liệu riêng)'; I18N.en.sub_tracey='Monthly work calendar (separate data)';
 I18N.vi['ai-live']='AI Live'; I18N.en['ai-live']='AI Live';
 I18N.vi['sub_ai-live']='Workflow · Nội dung · System design'; I18N.en['sub_ai-live']='Workflow · Content · System design';
 
@@ -139,7 +140,7 @@ const PAGES = [
   { k: 'progress', i: '📈' }, { k: 'daily', i: '📝' }, { k: 'weekly', i: '📋' },
   { k: 'selfreview', i: '🪞' }, { k: 'study', i: '🎓' },
   { sep: 1 },
-  { k: 'ai-live', i: '🤖' },
+  { k: 'ai-live', i: '🤖' }, { k: 'tracey', i: '👩‍💼' },
   { k: 'tasks', i: '🗂' }, { k: 'done', i: '✅' }, { k: 'rules', i: '📘' },
   { k: 'tips', i: '💡' }, { k: 'env', i: '🧭' }, { k: 'archive', i: '🗄' },
   { sep: 1 }, { k: 'settings', i: '⚙️' }
@@ -211,7 +212,7 @@ const App = {
     if (/[?&]demo=1/.test(location.search) && !App.connected()) { S.cfg = { url: '', token: '', demo: true }; }
     UI.renderNav();
     const h = App.pageKey(location.hash.replace('#', ''));
-    S.page = h === 'ai-live' ? h : h && App.connected() ? h : (App.connected() ? 'today' : 'settings');
+    S.page = h === 'ai-live' || h === 'tracey' ? h : h && App.connected() ? h : (App.connected() ? 'today' : 'settings');
     UI.renderNav();
     UI.render();
     if (App.connected()) App.refresh(false);
@@ -503,6 +504,7 @@ const UI = {
     $('#pageTitle').textContent = t(S.page);
     $('#pageSub').textContent = t('sub_' + S.page) === 'sub_' + S.page ? '' : t('sub_' + S.page);
     UI.renderSync();
+    if (S.page === 'tracey') { if (!document.getElementById('trRoot')) { $('#view').innerHTML = '<div id="trRoot"></div>'; Tracey.mount(document.getElementById('trRoot')); } return; }
     if (S.page === 'ai-live') { if (!document.getElementById('aiNativePanel')) { $('#view').innerHTML = FreyrAiLive.render(); FreyrAiLive.mount(); } return; }
     if (S.page !== 'settings' && !S.data) { $('#view').innerHTML = `<div class="empty">${App.connected() ? t('syncing') : ''}</div>`; if (!App.connected()) App.go('settings'); return; }
     const fn = Pages[S.page] || Pages.today;
