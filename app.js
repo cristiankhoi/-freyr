@@ -43,7 +43,7 @@ const I18N = {
     hours: 'giờ', today_cap: 'Công suất hôm nay', budget: 'Ngân sách giờ', first_exam: 'Ngày thi đầu tiên (còn 28 ngày thì tự chuyển sang B)',
     due: 'Hạn', weekly_hours: 'Giờ làm/học mỗi tuần', sunday_pct: 'Chủ nhật làm (% ngày thường)', save_budget: 'Lưu ngân sách', ratio: 'Hệ số lệch giờ',
     approvals: 'Chờ duyệt', isolog: 'iSolog tasks', sub_approvals: 'Bấm Duyệt phương án nào thì máy / Claude làm phương án đó',
-    sub_isolog: 'Mọi việc cho công ty: đang làm, đã làm, tiến trình, hiệu quả', sub_selfreview: 'Tốt / chưa tốt / bài học / giải pháp / tâm sự',
+    sub_isolog: 'Mọi việc cho công ty: đang làm, đã làm, tiến trình, hiệu quả', sub_selfreview: 'Freyr và Claude tự viết: đã làm gì, sai gì, bài học, giải pháp. Bạn chỉ đọc (tâm sự là tùy chọn)',
     sub_daily: 'Tự tạo 19:00 mỗi ngày', sub_weekly: 'Tự tạo 16:00 thứ Sáu, chỉ mảng iSolution, để gửi sếp', sub_progress: 'Tuần / tháng / quý theo 3 mảng',
     sub_study: 'Môn học, hạn eStudy, ngày thi, lịch ôn', sub_tips: 'Mẹo dùng Claude/AI đã học', sub_env: 'Công cụ, tài khoản, link hệ thống (không có mật khẩu)',
     sub_archive: 'Việc, thẻ duyệt, review cũ hơn 30 ngày',
@@ -106,7 +106,7 @@ const I18N = {
     hours: 'h', today_cap: 'Today capacity', budget: 'Hour budget', first_exam: 'First exam date (switches to B at 28 days)',
     due: 'Due', weekly_hours: 'Work/study hours per week', sunday_pct: 'Sunday load (% of a weekday)', save_budget: 'Save budget', ratio: 'Time drift',
     approvals: 'To approve', isolog: 'iSolog tasks', sub_approvals: 'Approving an option makes the machine / Claude carry it out',
-    sub_isolog: 'All company work: in progress, done, progress, results', sub_selfreview: 'Good / not good / lesson / fix / personal note',
+    sub_isolog: 'All company work: in progress, done, progress, results', sub_selfreview: 'Written by Freyr and Claude: what was done, what went wrong, lesson, fix. You only read (personal note is optional)',
     sub_daily: 'Built at 19:00 every day', sub_weekly: 'Built Friday 16:00, iSolution only, for the boss', sub_progress: 'Week / month / quarter by area',
     sub_study: 'Courses, eStudy deadlines, exam dates, revision plan', sub_tips: 'Claude/AI tips learned', sub_env: 'Tools, accounts, system links (no passwords)',
     sub_archive: 'Tasks, cards, reviews older than 30 days',
@@ -395,8 +395,9 @@ const App = {
     const f = Object.fromEntries(new FormData(form).entries());
     const body = Object.assign({ action: 'saveSelfReview' }, f);
     App.act(body, d => {
+      const old = (d.selfReviews || []).find(s => s.id === f.date) || {};
       d.selfReviews = (d.selfReviews || []).filter(s => s.id !== f.date);
-      d.selfReviews.unshift(Object.assign({ id: f.date, updated: nowLocal() }, f));
+      d.selfReviews.unshift(Object.assign({}, old, { id: f.date, updated: nowLocal() }, f));
     });
     UI.toast(t('saved'));
     return false;
@@ -823,9 +824,13 @@ const Pages = {
     const d = S.data, list = d.selfReviews || [], cur = list.find(x => x.id === d.today) || {};
     const keys = ['good', 'bad', 'lesson', 'fix', 'heart'];
     let streak = 0; for (let i = 0; i < 60; i++) { if (UI.srDone(addDay(d.today, -i))) streak++; else if (i > 0) break; }
-    const form = `<form class="card pad" onsubmit="return App.saveSelfReview(this)"><input type="hidden" name="date" value="${d.today}">
-      <div class="sec"><span>${t('sr_today')} · ${fmtDate(d.today)}</span><span class="mut">${t('streak')}: ${streak}</span></div>
-      ${keys.map(k => `<label class="f">${t('sr_' + k)}</label><textarea name="${k}">${esc(cur[k])}</textarea>${k === 'heart' ? `<div class="mut">${t('sr_heart_hint')}</div>` : ''}`).join('')}
+    const auto = ['good', 'bad', 'lesson', 'fix'];
+    const block = k => cur[k] ? `<div style="margin:8px 0"><b>${t('sr_' + k)}</b><div style="white-space:pre-wrap">${esc(cur[k])}</div></div>` : '';
+    const form = `<div class="card pad"><div class="sec"><span>${t('sr_today')} · ${fmtDate(d.today)}</span><span class="mut">${t('streak')}: ${streak}</span></div>
+      ${auto.some(k => cur[k]) ? auto.map(block).join('') : `<div class="mut">Freyr tự viết lúc 17:50 mỗi ngày; Claude tự khai ở cuối mỗi phiên làm việc.</div>`}
+      <div class="mut" style="margin-top:6px">[Máy] = Freyr tính từ dữ liệu thật · [Claude] = Claude tự khai</div></div>
+      <form class="card pad" style="margin-top:10px" onsubmit="return App.saveSelfReview(this)"><input type="hidden" name="date" value="${d.today}">
+      <label class="f">${t('sr_heart')} (tùy chọn)</label><textarea name="heart">${esc(cur.heart)}</textarea><div class="mut">${t('sr_heart_hint')}</div>
       ${cur.reply ? `<div class="ans" style="margin-top:8px"><b>${t('claude_reply')}:</b> ${esc(cur.reply)}</div>` : ''}
       <div class="actions" style="justify-content:flex-start"><button class="btn p">${t('save')}</button></div></form>`;
     const hist = list.filter(x => x.id !== d.today).map(s => `<div class="card pad" style="margin-bottom:10px"><div class="sec">${fmtDate(s.id)}</div>
