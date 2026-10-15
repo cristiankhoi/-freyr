@@ -8,7 +8,7 @@ const Tracey = (() => {
   };
   const E = s => String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const S = { cfg: ls.get(KEY, null), d: ls.get(CK, null), tab: 'today', month: '', el: null, busy: false, edit: null, report: null, err: '' };
-  const TABS = [['today', '📅 Hôm nay'], ['month', '🗓 Lịch tháng'], ['adhoc', '⚡ Chen ngang'], ['report', '📊 Báo cáo'], ['tpl', '🧩 Lịch mẫu'], ['set', '⚙️ Cài đặt']];
+  const TABS = [['today', '📅 Hôm nay'], ['month', '🗓 Lịch tháng'], ['adhoc', '⚡ Chen ngang'], ['report', '📊 Báo cáo'], ['tpl', '🧩 Lịch mẫu'], ['ct', '📇 Liên hệ'], ['set', '⚙️ Cài đặt']];
   const ST = { todo: 'Chưa làm', doing: 'Đang làm', done: 'Xong', skip: 'Bỏ qua' };
   const NEXT = { todo: 'doing', doing: 'done', done: 'todo', skip: 'todo' };
   const KIND = { monthly: 'Hằng tháng', quarterly: 'Hằng quý', weekly: 'Hằng tuần (khung cố định)', once: 'Một lần' };
@@ -71,7 +71,7 @@ const Tracey = (() => {
     const d = S.d;
     const tabs = `<div class="chips">${TABS.map(t => `<button class="chip ${S.tab === t[0] ? 'on' : ''}" onclick="Tracey.go('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
     const bar = S.err ? `<div class="banner">${E(S.err)} <button class="btn sm" onclick="Tracey.reload()">Thử lại</button></div>` : (S.busy ? '<div class="mut" style="margin:6px 0">Đang tải...</div>' : '');
-    let body = d ? ({ today, month, adhoc, report, tpl, set }[S.tab] || today)() : (S.busy ? '' : '<div class="empty">Chưa có dữ liệu</div>');
+    let body = d ? ({ today, month, adhoc, report, tpl, ct, set }[S.tab] || today)() : (S.busy ? '' : '<div class="empty">Chưa có dữ liệu</div>');
     S.el.innerHTML = tabs + bar + body;
   }
   function connectView() {
@@ -133,15 +133,16 @@ const Tracey = (() => {
 
   function adhoc() {
     const d = S.d, cats = d.cats;
-    const open = d.adhoc.filter(a => a.status === 'open'), done = d.adhoc.filter(a => a.status !== 'open');
+    const open = d.adhoc.filter(a => a.status === 'open'), back = d.adhoc.filter(a => a.status === 'backlog'), done = d.adhoc.filter(a => a.status === 'done');
     const row = a => `<div class="row" style="display:flex;gap:8px;align-items:center;padding:8px 12px"><div style="flex:1">${E(a.title)} ${Number(a.urgent) ? '<span class="late">gấp</span>' : ''}<div class="mut">${fd(a.date)} · ${E(cats[a.cat] || a.cat)}${a.minutes ? ' · ' + a.minutes + ' phút' : ''}${a.requester ? ' · ' + E(a.requester) : ''}</div></div>
-      ${a.status === 'open' ? `<button class="btn sm" onclick="Tracey.adhocDone('${E(a.id)}')">Xong</button>` : ''}<button class="btn sm ghost" onclick="Tracey.adhocDel('${E(a.id)}')">✕</button></div>`;
+      ${a.status === 'open' ? `<button class="btn sm" onclick="Tracey.adhocDone('${E(a.id)}')">Xong</button>` : a.status === 'backlog' ? `<button class="btn sm" onclick="Tracey.adhocPromote('${E(a.id)}')">Làm hôm nay</button>` : ''}<button class="btn sm ghost" onclick="Tracey.adhocDel('${E(a.id)}')">✕</button></div>`;
     return `<div class="card pad"><div class="sec" style="margin-top:0"><span>Ghi nhanh việc chen ngang</span></div>
       <div class="form"><input id="adT" placeholder="Việc gì? (không ghi tên khách/số tiền)" maxlength="120">
       <div class="two"><select id="adC">${Object.keys(cats).map(k => `<option value="${k}">${E(cats[k])}</option>`).join('')}</select><input id="adM" type="number" min="0" placeholder="Dự kiến (phút)"></div>
       <div class="two"><input id="adR" placeholder="Ai nhờ (mã, vd NV-01)" maxlength="20"><label><input type="checkbox" id="adU"> Gấp</label></div>
       <div class="actions"><button class="btn p" onclick="Tracey.adhocAdd()">Thêm</button></div></div></div>
       <div class="sec"><span>Đang mở (${open.length})</span></div><div class="card">${open.map(row).join('') || '<div class="empty">Không có</div>'}</div>
+      <div class="sec"><span>Tồn đọng, chưa xếp lịch (${back.length})</span></div><div class="card">${back.map(row).join('') || '<div class="empty">Không có</div>'}</div>
       <div class="sec"><span>Đã xong trong tháng (${done.length})</span></div><div class="card">${done.map(row).join('') || '<div class="empty">Chưa có</div>'}</div>`;
   }
 
@@ -182,6 +183,27 @@ const Tracey = (() => {
       <p class="mut">Ví dụ lịch học ACCA: thêm việc, chọn Lặp = "Hằng tuần", thứ trong tuần = 2,4 và giờ bắt đầu/kết thúc. Khung đó sẽ được trừ khỏi giờ làm khi xếp kế hoạch.</p>`;
   }
 
+  function ct() {
+    const d = S.d, ed = S.contact, q = (S.cq || '').toLowerCase();
+    if (ed) {
+      return `<div class="card pad"><h3 style="margin-top:0">${ed.id ? 'Sửa' : 'Thêm'} liên hệ</h3><div class="form">
+        <label class="f">Tên<input id="cN" value="${E(ed.name)}" maxlength="200"></label>
+        <div class="two"><label class="f">Công ty / đơn vị<input id="cO" value="${E(ed.org)}" maxlength="200"></label><label class="f">Vai trò (nhà cung cấp, ngân hàng, bảo hiểm...)<input id="cR" value="${E(ed.role)}" maxlength="200"></label></div>
+        <div class="two"><label class="f">Điện thoại<input id="cP" type="tel" value="${E(ed.phone)}" maxlength="200"></label><label class="f">Email<input id="cE" type="email" value="${E(ed.email)}" maxlength="200"></label></div>
+        <label class="f">Ghi chú<textarea id="cT" rows="3" maxlength="200">${E(ed.note)}</textarea></label>
+        <div class="actions"><button class="btn p" onclick="Tracey.saveContact()">Lưu</button> <button class="btn" onclick="Tracey.cancelContact()">Hủy</button>${ed.id ? ' <button class="btn" onclick="Tracey.delContact()">Xóa</button>' : ''}</div></div></div>`;
+    }
+    const list = (d.contacts || []).filter(c => !q || [c.name, c.org, c.role, c.phone, c.email, c.note].join(' ').toLowerCase().includes(q)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+    return `<div class="sec"><span>Liên hệ (${(d.contacts || []).length})</span><button class="btn sm p" onclick="Tracey.newContact()">+ Thêm</button></div>
+      <div class="card pad"><input id="cQ" placeholder="Tìm theo tên, công ty, số điện thoại..." value="${E(S.cq || '')}" style="width:100%" oninput="Tracey.search(this.value)"></div>
+      <div class="card" id="cList">${contactRows(list)}</div>`;
+  }
+  function contactRows(list) {
+    return list.map(c => `<div class="row" style="display:flex;gap:8px;align-items:center;padding:8px 12px"><div style="flex:1;min-width:0"><b>${E(c.name)}</b>${c.org ? ' · ' + E(c.org) : ''}${c.role ? ' <span class="mut">(' + E(c.role) + ')</span>' : ''}
+      <div class="mut">${c.phone ? `<a href="tel:${E(String(c.phone).replace(/[^0-9+]/g, ''))}">${E(c.phone)}</a>` : ''}${c.phone && c.email ? ' · ' : ''}${c.email ? `<a href="mailto:${E(c.email)}">${E(c.email)}</a>` : ''}</div>
+      ${c.note ? `<div class="mut">${E(c.note)}</div>` : ''}</div><button class="btn sm" onclick="Tracey.editContact('${E(c.id)}')">Sửa</button></div>`).join('') || '<div class="empty">Chưa có liên hệ</div>';
+  }
+
   function set() {
     const d = S.d;
     return `<div class="card pad"><h3 style="margin-top:0">Nhắc việc qua Gmail</h3>
@@ -211,12 +233,27 @@ const Tracey = (() => {
     },
     saveEnd() { const v = val('trEnd'); if (!v) return; act({ action: 'setEnd', date: S.d.today, end_time: v }, 'Đã lưu'); },
     adhocAdd() { const t = (val('adT') || '').trim(); if (!t) { toast('Nhập tên việc'); return; } act({ action: 'addAdhoc', title: t, cat: val('adC'), minutes: val('adM'), requester: val('adR'), urgent: document.getElementById('adU').checked }, 'Đã thêm'); },
+    adhocPromote(id) { act({ action: 'updateAdhoc', id, status: 'open', date: S.d.today }, 'Đã đưa vào hôm nay'); },
     adhocDone(id) { act({ action: 'updateAdhoc', id, status: 'done' }); },
     adhocDel(id) { if (confirm('Xóa việc này?')) act({ action: 'deleteAdhoc', id }); },
     async genReport() { try { S.report = await api({ action: 'report', month: S.month }); paint(); } catch (e) { toast('Lỗi: ' + e.message); } },
     copyReport() { navigator.clipboard.writeText(S.report.text).then(() => toast('Đã copy')); },
     async sendDraft() { try { const j = await api({ action: 'sendDraft', month: S.month }); toast(j.sent ? 'Đã gửi về Gmail' : 'Chưa cấu hình Gmail'); } catch (e) { toast('Lỗi: ' + e.message); } },
     saveProp() { act({ action: 'saveProposals', month: S.month, text: val('trProp') }, 'Đã lưu'); },
+    newContact() { S.contact = {}; paint(); },
+    editContact(id) { S.contact = Object.assign({}, S.d.contacts.find(c => c.id === id)); paint(); },
+    cancelContact() { S.contact = null; paint(); },
+    search(v) {
+      S.cq = v; const q = v.toLowerCase();
+      const list = (S.d.contacts || []).filter(c => !q || [c.name, c.org, c.role, c.phone, c.email, c.note].join(' ').toLowerCase().includes(q)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+      document.getElementById('cList').innerHTML = contactRows(list);
+    },
+    saveContact() {
+      const c = S.contact; Object.assign(c, { name: val('cN'), org: val('cO'), role: val('cR'), phone: val('cP'), email: val('cE'), note: val('cT') });
+      if (!String(c.name).trim()) { toast('Nhập tên'); return; }
+      S.contact = null; act({ action: 'saveContact', contact: c }, 'Đã lưu liên hệ');
+    },
+    delContact() { const id = S.contact.id; if (confirm('Xóa liên hệ này?')) { S.contact = null; act({ action: 'deleteContact', id }, 'Đã xóa'); } },
     newTpl() { S.edit = { kind: 'monthly', grp: 'acct', hard: 0 }; paint(); },
     editTpl(id) { S.edit = Object.assign({}, S.d.templates.find(t => t.id === id)); paint(); },
     cancelEdit() { S.edit = null; paint(); },
