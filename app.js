@@ -7,7 +7,7 @@ const I18N = {
     today: 'Hôm nay', decisions: 'Quyết định', review: 'Cần review', progress: 'Tiến độ', daily: 'Báo cáo ngày',
     weekly: 'Báo cáo tuần', selfreview: 'Self-review 18h', study: 'Học tập', marketing: 'Marketing tự động',
     tasks: 'Công việc', done: 'Hoàn thành', rules: 'Cách làm việc', tips: 'AI Tips', env: 'Môi trường',
-    archive: 'Lưu trữ', settings: 'Cài đặt', soon: 'GĐ',
+    archive: 'Lưu trữ', settings: 'Cài đặt', soon: 'GĐ', agent: 'Quản lý AI', sub_agent: 'Kiểm sản phẩm của các AI nhân viên, tự sửa lỗi hình thức, chỉ hỏi bạn việc quan trọng',
     sub_today: 'Kế hoạch theo khung giờ', sub_decisions: 'Việc chờ bạn quyết, kèm khuyến nghị của Claude',
     sub_review: 'Việc Claude làm xong, chờ bạn duyệt', sub_tasks: 'Việc chưa xếp vào hôm nay',
     sub_done: 'Việc đã xong 30 ngày gần nhất', sub_rules: 'Bản đọc gọn của các quy tắc làm việc', sub_settings: 'Kết nối dữ liệu',
@@ -70,7 +70,7 @@ const I18N = {
     today: 'Today', decisions: 'Decisions', review: 'To review', progress: 'Progress', daily: 'Daily report',
     weekly: 'Weekly report', selfreview: 'Self-review 6pm', study: 'Study', marketing: 'Marketing automation',
     tasks: 'Work', done: 'Completed', rules: 'How I work', tips: 'AI Tips', env: 'Environment',
-    archive: 'Archive', settings: 'Settings', soon: 'Ph',
+    archive: 'Archive', settings: 'Settings', soon: 'Ph', agent: 'AI Manager', sub_agent: 'Checks the AI workers output, auto-fixes formatting, asks you only for important things',
     sub_today: 'Time-blocked plan', sub_decisions: 'Waiting on you, with Claude\'s recommendation',
     sub_review: 'Finished by Claude, waiting for your approval', sub_tasks: 'Not scheduled for today',
     sub_done: 'Completed in the last 30 days', sub_rules: 'Short readable version of the working rules', sub_settings: 'Data connection',
@@ -140,7 +140,7 @@ const PAGES = [
   { k: 'progress', i: '📈' }, { k: 'daily', i: '📝' }, { k: 'weekly', i: '📋' },
   { k: 'selfreview', i: '🪞' }, { k: 'study', i: '🎓' },
   { sep: 1 },
-  { k: 'ai-live', i: '🤖' }, { k: 'tracey', i: '👩‍💼' },
+  { k: 'ai-live', i: '🤖' }, { k: 'agent', i: '🧠' }, { k: 'tracey', i: '👩‍💼' },
   { k: 'tasks', i: '🗂' }, { k: 'done', i: '✅' }, { k: 'rules', i: '📘' },
   { k: 'tips', i: '💡' }, { k: 'env', i: '🧭' }, { k: 'archive', i: '🗄' },
   { sep: 1 }, { k: 'settings', i: '⚙️' }
@@ -351,6 +351,14 @@ const App = {
     });
     UI.closeModal(); UI.toast(t('saved'));
     return false;
+  },
+
+  /** Quản lý AI: bật/tắt khẩn cấp, chế độ, AI chấm. */
+  async agentSet(body) {
+    body.action = 'agent';
+    await App.act(body, d => { if (d.agent) { if (body.on !== undefined) d.agent.on = body.on; if (body.mode) d.agent.mode = body.mode; if (body.llm !== undefined) d.agent.llm = body.llm; } });
+    UI.toast(t('saved'));
+    App.refresh();
   },
 
   saveBudget(form) {
@@ -895,6 +903,26 @@ const Pages = {
       ${safeUrl(n.link) ? `<a href="${safeUrl(n.link)}" target="_blank" rel="noopener">${esc(n.link.replace(/^https?:\/\//, '').slice(0, 60))} ↗</a>` : ''}</div>`).join('')}</div>`).join('');
   },
   tips() { return Pages.notesPage('tip'); },
+  agent() {
+    const a = (S.data && S.data.agent) || null;
+    if (!a) return `<div class="card pad"><p class="mut">Chưa có dữ liệu Quản lý AI. Cần cập nhật máy chủ Freyr (day_len.ps1 freyr).</p></div>`;
+    const wk = { bot: 'Bot tự động', claude: 'Claude', antigravity: 'Antigravity', chatgpt: 'ChatGPT/Codex' };
+    const st = { review: 'đang kiểm', ok: 'đạt', fix: 'chờ sửa', escalated: 'hỏi bạn', queued: 'chờ nộp' };
+    const cls = { ok: 'st-done', fix: 'st-doing', escalated: 'late', review: 'st-todo', queued: 'st-todo' };
+    const rows = (a.recent || []).map(j => `<div class="row"><div><div>${esc(j.title)}</div>
+      <div class="mut">${esc(wk[j.worker] || j.worker)} · ${esc(j.channel)} · sửa ${esc(j.tries || 0)} lần · ${esc(j.updated || '')}${j.evidence ? ' · ' + esc(String(j.evidence).slice(0, 160)) : ''}</div></div>
+      <span class="pill ${cls[j.status] || 'st-todo'}">${esc(st[j.status] || j.status)}</span></div>`).join('') || '<div class="empty">Chưa có sản phẩm nào được kiểm trong 7 ngày.</div>';
+    return `<div class="card pad">
+      <div class="sec">Trạng thái: ${a.on ? '🟢 ĐANG BẬT' : '🔴 ĐÃ TẮT KHẨN CẤP'} · chế độ ${a.mode === 'act' ? 'tự sửa lỗi hình thức' : 'chỉ báo cáo'} · AI chấm ${a.llm ? 'bật' : 'tắt (0 token)'}</div>
+      <p class="mut">Đạt ${a.ok} · chờ sửa ${a.fix} · đang kiểm ${a.review} · hỏi bạn ${a.escalated}</p>
+      <div class="actions" style="justify-content:flex-start;flex-wrap:wrap">
+        ${a.on ? `<button class="btn" style="background:#c0392b;color:#fff" onclick="App.agentSet({on:false})">⛔ Tắt khẩn cấp</button>` : `<button class="btn p" onclick="App.agentSet({on:true})">▶ Bật lại</button>`}
+        <button class="btn ${a.mode === 'act' ? 'p' : ''}" onclick="App.agentSet({mode:'act'})">Tự sửa hình thức</button>
+        <button class="btn ${a.mode === 'report' ? 'p' : ''}" onclick="App.agentSet({mode:'report'})">Chỉ báo cáo</button>
+        <button class="btn ${a.llm ? 'p' : ''}" onclick="App.agentSet({llm:${!a.llm}})">AI chấm: ${a.llm ? 'tắt đi' : 'bật lên'}</button>
+      </div></div>
+      <div class="card" style="margin-top:14px"><div class="sec pad">Sản phẩm gần đây (7 ngày)</div>${rows}</div>`;
+  },
   env() { return Pages.notesPage('env'); },
 
   archive() {
