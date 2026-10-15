@@ -81,11 +81,16 @@ const Tracey = (() => {
       <div class="actions"><button class="btn p" onclick="Tracey.connect(document.getElementById('trLink').value)">Kết nối</button></div></div>`;
   }
   const grpName = g => (S.d.groups[g] || S.d.cats[g] || g || '');
+  const ULBL = { 1: 'Quá hạn', 2: 'Gấp', 3: 'Cao', 4: 'Thường', 5: 'Khi rảnh' };
+  const UCOL = { 1: ['var(--reds)', 'var(--red)'], 2: ['var(--reds)', 'var(--red)'], 3: ['var(--warns)', 'var(--warn)'], 4: ['var(--soft)', 'var(--mut)'], 5: ['var(--soft)', 'var(--mut)'] };
+  const ubadge = u => u ? `<span class="pill" style="background:${UCOL[u.t][0]};color:${UCOL[u.t][1]};font-weight:600" title="${E(u.why || '')}">${E(u.label)}</span>` : '';
 
   function today() {
     const d = S.d, p = d.plan, td = d.today;
     const endRow = (d.days.find(x => String(x.date) === td) || {}).end_time || '';
     const pct = p.capacity ? Math.round(p.used * 100 / p.capacity) : 0;
+    const seen = {}; let nr = 0; const rank = b => (b.kind === 'fixed' ? '' : (b.key in seen ? seen[b.key] : (seen[b.key] = ++nr)));
+    const first = p.blocks.find(b => b.kind !== 'fixed');
     const upcoming = d.instances.filter(x => x.kind !== 'weekly' && x.status !== 'done' && x.status !== 'skip' && x.due >= td && x.due <= addDays(td, 7)).sort((a, b) => a.due < b.due ? -1 : 1);
     const late = d.instances.filter(x => x.kind !== 'weekly' && x.status !== 'done' && x.status !== 'skip' && x.due < td);
     return `<div class="grid4" style="margin:10px 0">
@@ -94,11 +99,12 @@ const Tracey = (() => {
       <div class="card pad kpi"><div class="l">Quá hạn</div><div class="v" style="color:${late.length ? 'var(--red)' : 'inherit'}">${late.length}</div></div>
       <div class="card pad kpi"><div class="l">Chen ngang đang mở</div><div class="v">${d.adhoc.filter(a => a.status === 'open').length}</div></div></div>
       ${!p.workday ? '<div class="banner">Hôm nay không phải ngày làm việc.</div>' : ''}
-      ${p.overflow.length ? `<div class="banner" style="background:var(--reds);color:var(--red)"><b>Không đủ giờ hôm nay:</b> ${p.overflow.map(o => `${E(o.title)} (hạn ${fd(o.due)}${o.overdue ? ', quá hạn' : ''})`).join('; ')}. Cân nhắc lùi việc mềm hoặc báo người giao.</div>` : ''}
+      ${p.overflow.length ? `<div class="banner" style="background:var(--reds);color:var(--red)"><b>Không đủ giờ hôm nay:</b> ${p.overflow.map(o => `${E(o.title)} (${o.urg ? o.urg.label + ', ' : ''}hạn ${fd(o.due)})`).join('; ')}. Cân nhắc lùi việc mềm hoặc báo người giao.</div>` : ''}
       <div class="sec"><span>Kế hoạch đề xuất hôm nay (${fd(td)})</span></div>
+      ${first ? `<div class="card pad" style="margin-bottom:8px"><b>Làm đầu tiên:</b> ${E(first.title)} ${ubadge(first.urg)}<div class="mut" style="margin-top:4px">Mức gấp: ${[1, 2, 3, 4, 5].map(t => ubadge({ t, label: ULBL[t], why: '' })).join(' ')} &middot; số thứ tự bên trái là thứ tự nên làm; chạm vào nhãn để xem lý do.</div></div>` : ''}
       <div class="card">${p.blocks.length ? p.blocks.map(b => `<div class="row" style="display:flex;gap:10px;align-items:center;padding:8px 12px">
-        <b style="min-width:92px">${b.start}-${b.end}</b>
-        <div style="flex:1;min-width:0">${E(b.title)}${b.tentative ? ' <span class="mut">(thời lượng tạm)</span>' : ''}${b.partial ? ' <span class="mut">(làm một phần)</span>' : ''}${b.overdue ? ' <span class="late">quá hạn</span>' : ''}<div class="mut">${E(grpName(b.grp))}${b.due ? ' · hạn ' + fd(b.due) : ''}${b.hard ? ' · hạn cứng' : ''}</div></div>
+        ${b.kind === 'fixed' ? '<span style="min-width:24px"></span>' : `<span class="pill" style="min-width:24px;text-align:center;font-weight:700">${rank(b)}</span>`}<b style="min-width:92px">${b.start}-${b.end}</b>
+        <div style="flex:1;min-width:0">${ubadge(b.urg)} ${E(b.title)}${b.tentative ? ' <span class="mut">(thời lượng tạm)</span>' : ''}${b.partial ? ' <span class="mut">(làm một phần)</span>' : ''}${b.overdue ? ' <span class="late">quá hạn</span>' : ''}<div class="mut">${E(grpName(b.grp))}${b.urg ? ' · ' + E(b.urg.why) : (b.due ? ' · hạn ' + fd(b.due) : '')}</div></div>
         ${b.kind === 'task' ? `<button class="btn sm" onclick="Tracey.set('${E(b.key)}','done')">Xong</button>` : b.kind === 'adhoc' ? `<button class="btn sm" onclick="Tracey.adhocDone('${E(b.key)}')">Xong</button>` : ''}</div>`).join('') : '<div class="empty">Không có việc nào trong khung giờ hôm nay</div>'}</div>
       <div class="sec"><span>Giờ tắt máy hôm nay</span></div>
       <div class="card pad"><input type="time" id="trEnd" value="${E(endRow)}"> <button class="btn sm" onclick="Tracey.saveEnd()">Lưu</button> <span class="mut">Dùng làm số liệu làm thêm giờ cho báo cáo.</span></div>
@@ -118,7 +124,7 @@ const Tracey = (() => {
         const t = tpl(x.tpl), steps = String(t.steps || '').split('\n').filter(String), sd = String(x.steps_done || '').split(',');
         const late = x.status !== 'done' && x.status !== 'skip' && x.due < td;
         return `<details class="row" style="padding:8px 12px"><summary style="cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <span class="pill ${x.status === 'done' ? 'st-done' : ''}">${ST[x.status]}</span><b>${x.from === x.due ? fd(x.due) : fd(x.from) + '–' + fd(x.due)}</b> ${E(x.title)}
+          <span class="pill ${x.status === 'done' ? 'st-done' : ''}">${ST[x.status]}</span>${x.urg ? ubadge(x.urg) : ''}<b>${x.from === x.due ? fd(x.due) : fd(x.from) + '–' + fd(x.due)}</b> ${E(x.title)}
           ${late ? '<span class="late">quá hạn</span>' : ''}<span class="mut">${E(grpName(x.grp))} · ${x.hard ? 'hạn cứng' : 'hạn mềm'}${x.est ? ' · ' + hm(x.est) : ''}</span></summary>
           <div style="padding:8px 0 4px">
             ${t.approver ? `<div class="mut">Duyệt: ${E(t.approver)}${t.output ? ' · Gửi: ' + E(t.output) : ''}</div>` : ''}
@@ -172,6 +178,7 @@ const Tracey = (() => {
         <div class="two"><label class="f">Giờ bắt đầu (khung cố định)<input id="tS" type="time" value="${E(t.start)}"></label><label class="f">Giờ kết thúc<input id="tE" type="time" value="${E(t.end)}"></label></div>
         <div class="two"><label class="f">Thời lượng (phút)<input id="tEst" type="number" value="${E(t.est_min)}"></label><label class="f">Người duyệt<input id="tA" value="${E(t.approver)}"></label></div>
         <div class="two"><label><input type="checkbox" id="tH" ${Number(t.hard) ? 'checked' : ''}> Hạn cứng</label><label><input type="checkbox" id="tAu" ${Number(t.auto) ? 'checked' : ''}> Có thể tự động hóa</label></div>
+        <label class="f">Mức ưu tiên (cùng mức gấp thì việc ưu tiên cao làm trước)<select id="tP"><option value="1" ${String(t.prio) === '1' ? 'selected' : ''}>Cao</option><option value="" ${!t.prio || String(t.prio) === '2' ? 'selected' : ''}>Thường</option><option value="3" ${String(t.prio) === '3' ? 'selected' : ''}>Khi rảnh (làm khi có thời gian)</option></select></label>
         <label class="f">Các bước (mỗi dòng một bước)<textarea id="tSt" rows="6">${E(t.steps)}</textarea></label>
         <label class="f">Ghi chú<input id="tN" value="${E(t.note)}"></label>
         <div class="actions"><button class="btn p" onclick="Tracey.saveTpl()">Lưu</button> <button class="btn" onclick="Tracey.cancelEdit()">Hủy</button>${t.id ? ' <button class="btn" onclick="Tracey.delTpl()">Tắt việc này</button>' : ''}</div></div></div>`;
@@ -259,7 +266,7 @@ const Tracey = (() => {
     cancelEdit() { S.edit = null; paint(); },
     saveTpl() {
       const t = S.edit;
-      Object.assign(t, { title: val('tT'), grp: val('tG'), kind: val('tK'), from: val('tF'), to: val('tTo'), months: val('tM'), weekdays: val('tW'), start: val('tS'), end: val('tE'), est_min: val('tEst'), approver: val('tA'), hard: document.getElementById('tH').checked ? 1 : 0, auto: document.getElementById('tAu').checked ? 1 : 0, steps: val('tSt'), note: val('tN') });
+      Object.assign(t, { title: val('tT'), grp: val('tG'), kind: val('tK'), from: val('tF'), to: val('tTo'), months: val('tM'), weekdays: val('tW'), start: val('tS'), end: val('tE'), est_min: val('tEst'), approver: val('tA'), hard: document.getElementById('tH').checked ? 1 : 0, auto: document.getElementById('tAu').checked ? 1 : 0, prio: val('tP'), steps: val('tSt'), note: val('tN') });
       if (!String(t.title).trim()) { toast('Nhập tên việc'); return; }
       S.edit = null; act({ action: 'saveTemplate', tpl: t }, 'Đã lưu lịch mẫu');
     },
