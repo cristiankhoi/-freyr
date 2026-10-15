@@ -1,5 +1,5 @@
 // Lưu khung app Tracey để mở nhanh. Dữ liệu không lưu ở đây. Mỗi lần sửa app: tăng số phiên bản.
-const CACHE = 'tracey-v3';
+const CACHE = 'tracey-v4';
 const FILES = ['./', 'index.html', 'app.css', 'tracey.js', 'manifest.webmanifest', 'icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

@@ -8,7 +8,7 @@ const Tracey = (() => {
   };
   const E = s => String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const S = { cfg: ls.get(KEY, null), d: ls.get(CK, null), tab: 'today', month: '', el: null, busy: false, edit: null, report: null, err: '' };
-  const TABS = [['today', '📅 Hôm nay'], ['month', '🗓 Lịch tháng'], ['adhoc', '⚡ Chen ngang'], ['report', '📊 Báo cáo'], ['tpl', '🧩 Lịch mẫu'], ['ct', '📇 Liên hệ'], ['set', '⚙️ Cài đặt']];
+  const TABS = [['today', '📅 Hôm nay'], ['month', '🗓 Lịch tháng'], ['adhoc', '⚡ Chen ngang'], ['grow', '🚀 Phát triển'], ['review', '📝 Review'], ['report', '📊 Báo cáo'], ['tpl', '🧩 Lịch mẫu'], ['ct', '📇 Liên hệ'], ['set', '⚙️ Cài đặt']];
   const ST = { todo: 'Chưa làm', doing: 'Đang làm', done: 'Xong', skip: 'Bỏ qua' };
   const NEXT = { todo: 'doing', doing: 'done', done: 'todo', skip: 'todo' };
   const KIND = { monthly: 'Hằng tháng', quarterly: 'Hằng quý', weekly: 'Hằng tuần (khung cố định)', once: 'Một lần' };
@@ -64,6 +64,11 @@ const Tracey = (() => {
     if (c) { S.cfg = c; ls.set(KEY, c); history.replaceState(null, '', location.pathname + location.search); }
     paint();
     if (S.cfg) load();
+    // mở lại app / quay lại tab thì tự tải dữ liệu mới nhất (tối đa mỗi 60 giây một lần)
+    if (!mount._v) {
+      mount._v = 1; let t0 = Date.now();
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.cfg && !S.busy && !S.edit && !S.rv && !S.contact && Date.now() - t0 > 60000) { t0 = Date.now(); load(); } });
+    }
   }
   function paint() {
     if (!S.el) return;
@@ -71,7 +76,7 @@ const Tracey = (() => {
     const d = S.d;
     const tabs = `<div class="chips">${TABS.map(t => `<button class="chip ${S.tab === t[0] ? 'on' : ''}" onclick="Tracey.go('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
     const bar = S.err ? `<div class="banner">${E(S.err)} <button class="btn sm" onclick="Tracey.reload()">Thử lại</button></div>` : (S.busy ? '<div class="mut" style="margin:6px 0">Đang tải...</div>' : '');
-    let body = d ? ({ today, month, adhoc, report, tpl, ct, set }[S.tab] || today)() : (S.busy ? '' : '<div class="empty">Chưa có dữ liệu</div>');
+    let body = d ? ({ today, month, adhoc, grow, review, report, tpl, ct, set }[S.tab] || today)() : (S.busy ? '' : '<div class="empty">Chưa có dữ liệu</div>');
     S.el.innerHTML = tabs + bar + body;
   }
   function connectView() {
@@ -99,6 +104,7 @@ const Tracey = (() => {
       <div class="card pad kpi"><div class="l">Quá hạn</div><div class="v" style="color:${late.length ? 'var(--red)' : 'inherit'}">${late.length}</div></div>
       <div class="card pad kpi"><div class="l">Chen ngang đang mở</div><div class="v">${d.adhoc.filter(a => a.status === 'open').length}</div></div></div>
       ${!p.workday ? '<div class="banner">Hôm nay không phải ngày làm việc.</div>' : ''}
+      ${growCard()}
       ${p.overflow.length ? `<div class="banner" style="background:var(--reds);color:var(--red)"><b>Không đủ giờ hôm nay:</b> ${p.overflow.map(o => `${E(o.title)} (${o.urg ? o.urg.label + ', ' : ''}hạn ${fd(o.due)})`).join('; ')}. Cân nhắc lùi việc mềm hoặc báo người giao.</div>` : ''}
       <div class="sec"><span>Kế hoạch đề xuất hôm nay (${fd(td)})</span></div>
       ${first ? `<div class="card pad" style="margin-bottom:8px"><b>Làm đầu tiên:</b> ${E(first.title)} ${ubadge(first.urg)}<div class="mut" style="margin-top:4px">Mức gấp: ${[1, 2, 3, 4, 5].map(t => ubadge({ t, label: ULBL[t], why: '' })).join(' ')} &middot; số thứ tự bên trái là thứ tự nên làm; chạm vào nhãn để xem lý do.</div></div>` : ''}
@@ -112,6 +118,50 @@ const Tracey = (() => {
       <div class="card">${upcoming.length ? upcoming.map(x => `<div class="row" style="padding:8px 12px">${fd(x.due)} · ${E(x.title)} <span class="mut">${x.hard ? 'cứng' : 'mềm'} · ${ST[x.status]}</span></div>`).join('') : '<div class="empty">Không có</div>'}</div>`;
   }
   function addDays(d, n) { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+
+  /* ---- khung phát triển 12 tuần ---- */
+  const PHASES = ['Tuần 1-4: Hiểu đường đi của số (MISA đến Conso)', 'Tuần 5-8: Phân tích và viết nhận xét (comments)', 'Tuần 9-12: Làm trọn vòng conso của group'];
+  function growCard() {
+    const g = S.d.growth; if (!g || !g.on || !g.started || g.finished || !g.workday) return '';
+    return `<div class="card pad" style="margin:8px 0;border-left:4px solid var(--acc)"><div class="mut">🚀 Khung phát triển hôm nay · ${E(g.slot[0])}-${E(g.slot[1])} · tuần ${g.week}/12</div>
+      <div style="margin:4px 0"><b>${E(g.title)}</b></div>
+      <button class="btn sm ${g.done ? '' : 'p'}" onclick="Tracey.growDone(${g.done ? 0 : 1})">${g.done ? '✓ Đã xong (bấm để bỏ)' : 'Xong'}</button> <button class="btn sm" onclick="Tracey.go('grow')">Ghi chú / xem lộ trình</button></div>`;
+  }
+  function grow() {
+    const g = S.d.growth || {};
+    if (!g.on) return `<div class="card pad">Chưa bật lộ trình phát triển.</div>`;
+    const startRow = `<div class="card pad"><label class="f">Ngày bắt đầu (nên là thứ Hai)<input type="date" id="gStart" value="${E(g.start)}"></label> <button class="btn sm" onclick="Tracey.growStart()">Lưu ngày bắt đầu</button></div>`;
+    if (!g.started) return `<div class="sec"><span>Lộ trình 12 tuần hướng tới CFO</span></div><div class="card pad">Bắt đầu từ ${fd(g.start)}. Mỗi ngày làm việc có một khung ${g.minutes} phút (${E(g.slot[0])}-${E(g.slot[1])}) trong giờ làm.</div>${startRow}`;
+    const wk = Math.min(g.week, 12);
+    const tdy = g.finished ? '<div class="empty">Đã qua 12 tuần. Xem lại ghi chú và đặt mục tiêu mới.</div>' : g.workday ? `<div class="card pad"><div class="mut">Hôm nay · ${E(g.slot[0])}-${E(g.slot[1])}</div><div style="margin:6px 0"><b>${E(g.title)}</b></div>
+      <textarea id="gNote" rows="4" style="width:100%" placeholder="Ghi chú: vì sao số này ra, điều mới hiểu, câu hỏi chưa rõ (không ghi tên khách/số tiền)">${E(g.note)}</textarea>
+      <div class="actions"><button class="btn p sm" onclick="Tracey.growDone(1,true)">Lưu và đánh dấu xong</button> <button class="btn sm" onclick="Tracey.growDone(0,true)">Lưu ghi chú (chưa xong)</button></div></div>` : '<div class="empty">Hôm nay không phải ngày làm việc.</div>';
+    const notes = (g.log || []).filter(r => r.note).slice(-12).reverse();
+    return `<div class="sec"><span>Lộ trình 12 tuần hướng tới CFO · tuần ${wk}/12 · đã xong ${g.doneCount} buổi</span></div>
+      <div class="card pad"><b>${E(g.phaseName || PHASES[0])}</b><div class="mut">Mục tiêu 12 tuần: tự làm được conso của group và hiểu P&L từ đầu đến cuối.</div></div>
+      ${tdy}
+      <div class="sec"><span>Ba giai đoạn</span></div>
+      <div class="card">${PHASES.map((p, i) => `<div class="row" style="padding:8px 12px">${i + 1 === g.phase ? '▶ ' : ''}${E(p)}</div>`).join('')}</div>
+      <div class="sec"><span>Ghi chú gần đây</span></div>
+      <div class="card">${notes.map(r => `<div class="row" style="padding:8px 12px"><div class="mut">${fd(r.date)} ${r.done ? '· xong' : ''}</div>${E(r.note)}</div>`).join('') || '<div class="empty">Chưa có ghi chú</div>'}</div>
+      ${startRow}`;
+  }
+
+  /* ---- Review report: vấn đề, đề xuất, phản hồi ---- */
+  function review() {
+    const d = S.d, ed = S.rv;
+    if (ed) return `<div class="card pad"><h3 style="margin-top:0">${ed.id ? 'Sửa' : 'Thêm'} mục review</h3><div class="form">
+      <label class="f">Vấn đề phát hiện (không ghi tên khách/số tiền)<textarea id="rvI" rows="3" maxlength="1000">${E(ed.issue)}</textarea></label>
+      <label class="f">Đề xuất của chị<textarea id="rvP" rows="3" maxlength="1000">${E(ed.proposal)}</textarea></label>
+      <label class="f">Phản hồi của quản lý<textarea id="rvR" rows="2" maxlength="1000">${E(ed.response)}</textarea></label>
+      <div class="two"><label class="f">Ngày<input type="date" id="rvD" value="${E(String(ed.date || d.today).slice(0, 10))}"></label>
+      <label class="f">Trạng thái<select id="rvS"><option value="open" ${ed.status !== 'closed' ? 'selected' : ''}>Đang mở</option><option value="closed" ${ed.status === 'closed' ? 'selected' : ''}>Đã xử lý</option></select></label></div>
+      <div class="actions"><button class="btn p" onclick="Tracey.saveReview()">Lưu</button> <button class="btn" onclick="Tracey.cancelReview()">Hủy</button>${ed.id ? ' <button class="btn" onclick="Tracey.delReview()">Xóa</button>' : ''}</div></div></div>`;
+    const list = d.reviews || [];
+    return `<div class="sec"><span>Review report (${list.length} mục) · các mục trong tháng tự vào báo cáo tháng</span><button class="btn sm p" onclick="Tracey.newReview()">+ Thêm</button></div>
+      <div class="card">${list.map((r, i) => `<div class="row" style="display:flex;gap:8px;align-items:flex-start;padding:8px 12px"><span class="pill" style="min-width:24px;text-align:center">${list.length - i}</span><div style="flex:1;min-width:0"><div class="mut">${fd(r.date)} · ${r.status === 'closed' ? 'đã xử lý' : 'đang mở'}</div><div><b>Vấn đề:</b> ${E(r.issue)}</div>${r.proposal ? `<div><b>Đề xuất:</b> ${E(r.proposal)}</div>` : ''}${r.response ? `<div><b>Phản hồi:</b> ${E(r.response)}</div>` : ''}</div>
+        <button class="btn sm" onclick="Tracey.editReview('${E(r.id)}')">Sửa</button></div>`).join('') || '<div class="empty">Chưa có mục nào. Ghi vấn đề phát hiện khi làm báo cáo cùng đề xuất của chị.</div>'}</div>`;
+  }
 
   function month() {
     const d = S.d, td = d.today;
@@ -271,6 +321,17 @@ const Tracey = (() => {
       S.edit = null; act({ action: 'saveTemplate', tpl: t }, 'Đã lưu lịch mẫu');
     },
     delTpl() { const id = S.edit.id; if (confirm('Tắt việc này khỏi lịch?')) { S.edit = null; act({ action: 'deleteTemplate', id }, 'Đã tắt'); } },
+    growDone(done, withNote) { const n = document.getElementById('gNote'); const g = S.d.growth; act({ action: 'growthDone', date: S.d.today, done: done ? 1 : 0, note: n ? n.value : (withNote ? '' : g.note || '') }, 'Đã lưu'); },
+    growStart() { const v = val('gStart'); if (!v) return; act({ action: 'growthStart', date: v }, 'Đã lưu ngày bắt đầu'); },
+    newReview() { S.rv = {}; paint(); },
+    editReview(id) { S.rv = Object.assign({}, S.d.reviews.find(r => r.id === id)); paint(); },
+    cancelReview() { S.rv = null; paint(); },
+    saveReview() {
+      const r = S.rv; Object.assign(r, { issue: val('rvI'), proposal: val('rvP'), response: val('rvR'), date: val('rvD'), status: val('rvS') });
+      if (!String(r.issue).trim()) { toast('Nhập vấn đề'); return; }
+      S.rv = null; act({ action: 'saveReview', review: r }, 'Đã lưu');
+    },
+    delReview() { const id = S.rv.id; if (confirm('Xóa mục này?')) { S.rv = null; act({ action: 'deleteReview', id }, 'Đã xóa'); } },
     rotate() { if (confirm('Link lịch cũ sẽ ngừng hoạt động. Tiếp tục?')) act({ action: 'rotateIcs' }, 'Đã đổi link'); }
   };
 })();
