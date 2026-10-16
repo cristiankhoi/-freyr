@@ -132,6 +132,7 @@ const I18N = {
 };
 
 I18N.vi.tracey='Tracey Altios'; I18N.en.tracey='Tracey Altios'; I18N.vi.sub_tracey='Lịch việc chu kỳ tháng của chị (dữ liệu riêng)'; I18N.en.sub_tracey='Monthly work calendar (separate data)';
+I18N.vi.perf='Hiệu suất AI'; I18N.en.perf='AI performance'; I18N.vi.sub_perf='Lượt, kiểm chứng, quota, sự cố của từng công cụ và model'; I18N.en.sub_perf='Calls, verification, quota, incidents per tool and model';
 I18N.vi['ai-live']='AI Live'; I18N.en['ai-live']='AI Live';
 I18N.vi['sub_ai-live']='Workflow · Nội dung · System design'; I18N.en['sub_ai-live']='Workflow · Content · System design';
 
@@ -140,7 +141,7 @@ const PAGES = [
   { k: 'progress', i: '📈' }, { k: 'daily', i: '📝' }, { k: 'weekly', i: '📋' },
   { k: 'selfreview', i: '🪞' }, { k: 'study', i: '🎓' },
   { sep: 1 },
-  { k: 'ai-live', i: '🤖' }, { k: 'agent', i: '🧠' }, { k: 'tracey', i: '👩‍💼' },
+  { k: 'ai-live', i: '🤖' }, { k: 'agent', i: '🧠' }, { k: 'perf', i: '📊' }, { k: 'tracey', i: '👩‍💼' },
   { k: 'tasks', i: '🗂' }, { k: 'done', i: '✅' }, { k: 'rules', i: '📘' },
   { k: 'tips', i: '💡' }, { k: 'env', i: '🧭' }, { k: 'archive', i: '🗄' },
   { sep: 1 }, { k: 'settings', i: '⚙️' }
@@ -361,6 +362,11 @@ const App = {
     App.refresh();
   },
 
+  /** Mở lại thẻ duyệt đã hết hạn (không xóa gì, chỉ đổi trạng thái về mở). */
+  async reopenCard(id) {
+    try { await Api.post({ action: 'cardReopen', id }); UI.toast(t('saved')); App.refresh(true); } catch (e) { UI.toast(e.message || String(e)); }
+  },
+
   saveBudget(form) {
     const f = new FormData(form);
     const body = { action: 'setBudget', mode: f.get('mode'), first_exam: f.get('first_exam') || '', weekly_hours: Number(f.get('weekly_hours') || 70), sunday_factor: Number(f.get('sunday_pct') || 45) / 100 };
@@ -469,7 +475,7 @@ const UI = {
     const iso = UI.isoTasks().filter(x => x.status === 'todo' || x.status === 'doing');
     return {
       today: d.tasks.filter(x => x.status !== 'done' && x.status !== 'skip').length,
-      approvals: d.decisions.filter(x => x.status !== 'decided').length + d.reviews.filter(x => x.status === 'open').length,
+      approvals: d.decisions.filter(x => x.status !== 'decided' && x.status !== 'expired').length + d.reviews.filter(x => x.status === 'open').length,
       isolog: iso.filter(x => x.due && x.due.slice(0, 10) < d.today).length || '',
       selfreview: UI.srDone(d.today) || Number(hhmm().slice(0, 2)) < 18 ? '' : '!'
     };
@@ -514,6 +520,7 @@ const UI = {
     $('#pageSub').textContent = t('sub_' + S.page) === 'sub_' + S.page ? '' : t('sub_' + S.page);
     UI.renderSync();
     if (S.page === 'tracey') { if (!document.getElementById('trRoot')) { $('#view').innerHTML = '<div id="trRoot"></div>'; Tracey.mount(document.getElementById('trRoot')); } return; }
+    if (S.page === 'perf') { if (!document.getElementById('perfRoot')) { $('#view').innerHTML = '<div id="perfRoot"></div>'; FreyrPerf.mount(document.getElementById('perfRoot')); } return; }
     if (S.page === 'ai-live') { if (!document.getElementById('aiNativePanel')) { $('#view').innerHTML = FreyrAiLive.render(); FreyrAiLive.mount(); } return; }
     if (S.page !== 'settings' && !S.data) { $('#view').innerHTML = `<div class="empty">${App.connected() ? t('syncing') : ''}</div>`; if (!App.connected()) App.go('settings'); return; }
     const fn = Pages[S.page] || Pages.today;
@@ -709,7 +716,7 @@ const Pages = {
     const d = S.data, now = hhmm();
     const live = d.tasks.filter(x => x.status !== 'skip');
     const done = live.filter(x => x.status === 'done');
-    const openDec = d.decisions.filter(x => x.status !== 'decided');
+    const openDec = d.decisions.filter(x => x.status !== 'decided' && x.status !== 'expired');
     const wait = openDec.length ? openDec.reduce((s, x) => s + daysBetween(x.created || d.today, d.today), 0) / openDec.length : 0;
     const measured = done.filter(x => Number(x.actual_min) > 0);
     const est = measured.reduce((s, x) => s + Number(x.minutes || 0), 0) / 60, act = measured.reduce((s, x) => s + Number(x.actual_min || 0), 0) / 60;
@@ -743,12 +750,14 @@ const Pages = {
     const d = S.data;
     // gấp + quan trọng lên đầu (Eisenhower), rồi thẻ cũ trước
     const score = x => (String(x.urgent) === '1' ? 0 : 2) + (String(x.important) === '1' ? 0 : 1);
-    const open = d.decisions.filter(x => x.status !== 'decided').sort((a, b) => score(a) - score(b) || ((a.created || '') < (b.created || '') ? -1 : 1));
+    const open = d.decisions.filter(x => x.status !== 'decided' && x.status !== 'expired').sort((a, b) => score(a) - score(b) || ((a.created || '') < (b.created || '') ? -1 : 1));
     const done = d.decisions.filter(x => x.status === 'decided').sort((a, b) => (a.decided_at < b.decided_at ? 1 : -1));
+    const expired = d.decisions.filter(x => x.status === 'expired');
     const revOpen = d.reviews.filter(x => x.status === 'open');
     const warn = !d.meta.wp_ready && open.some(x => JSON.stringify(x.options).match(/publish_now|schedule_at/)) ? `<div class="banner">${t('wp_missing')}</div>` : '';
     return `${warn}<div class="group-h">${t('open_items')} (${open.length + revOpen.length})</div>${open.length ? open.map(x => UI.decisionCard(x, false)).join('') : (revOpen.length ? '' : `<div class="card empty">${t('empty')}</div>`)}
       ${revOpen.length || d.reviews.length ? `<div class="group-h">${t('legacy_reviews')}</div>${Pages.review()}` : ''}
+      ${expired.length ? `<div class="group-h">Hết hạn (quá 3 ngày chưa duyệt, không bị xóa) (${expired.length})</div>${expired.map(x => `<div class="card pad"><b>${esc(x.title)}</b><div class="mut">tạo ${esc(String(x.created || '').slice(0, 16))}</div><div class="actions" style="justify-content:flex-start;margin-top:6px"><button class="btn sm p" onclick="App.reopenCard('${esc(x.id)}')">Mở lại</button></div></div>`).join('')}` : ''}
       ${done.length ? `<div class="group-h">${t('recent_done')}</div>${done.map(x => UI.decisionCard(x, false)).join('')}` : ''}`;
   },
 
@@ -926,7 +935,8 @@ const Pages = {
         <button class="btn ${a.mode === 'report' ? 'p' : ''}" onclick="App.agentSet({mode:'report'})">Chỉ báo cáo</button>
         <button class="btn ${a.llm ? 'p' : ''}" onclick="App.agentSet({llm:${!a.llm}})">AI chấm: ${a.llm ? 'tắt đi' : 'bật lên'}</button>
       </div></div>
-      <div class="card" style="margin-top:14px"><div class="sec pad">Sản phẩm gần đây (7 ngày)</div>${rows}</div>`;
+      <div style="margin-top:14px">${window.FreyrPerf ? FreyrPerf.jobForm() : ''}</div>
+      <div class="card" style="margin-top:14px"><div class="sec pad">Sản phẩm gần đây (7 ngày) · <a href="#perf">xem Hiệu suất AI</a></div>${rows}</div>`;
   },
   env() { return Pages.notesPage('env'); },
 
