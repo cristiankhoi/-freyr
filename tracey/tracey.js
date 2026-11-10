@@ -16,6 +16,12 @@ const Tracey = (() => {
   const hm = m => Math.floor(m / 60) + 'h' + (m % 60 ? ('0' + (m % 60)).slice(-2) : '');
   const fd = d => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '';
   const tmin = s => { const p = String(s).split(':'); return Number(p[0]) * 60 + Number(p[1] || 0); };
+  // Giờ/ngày từ ô Sheet ("1899-12-30 12:00" -> "12:00"; "2026-11-12 00:00" -> "2026-11-12")
+  const tmv = v => { const m = String(v || '').match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*$/); return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : ''; };
+  const dv = v => { const s = String(v || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; };
+  const REM = [[0, 'Không nhắc'], [15, '15 phút'], [30, '30 phút'], [60, '1 giờ'], [120, '2 giờ'], [1440, '1 ngày']];
+  const remTxt = m => { const r = REM.find(z => z[0] === Number(m)); return r ? r[1] : (Number(m) ? m + ' phút' : 'không nhắc'); };
+  const remSel = (attrs, cur) => `<select ${attrs}>${REM.map(r => `<option value="${r[0]}" ${r[0] === Number(cur) ? 'selected' : ''}>${r[1]}</option>`).join('')}</select>`;
 
   /* ---- gọi máy chủ ---- */
   async function api(body) {
@@ -110,7 +116,7 @@ const Tracey = (() => {
       ${first ? `<div class="card pad" style="margin-bottom:8px"><b>Làm đầu tiên:</b> ${E(first.title)} ${ubadge(first.urg)}<div class="mut" style="margin-top:4px">Mức gấp: ${[1, 2, 3, 4, 5].map(t => ubadge({ t, label: ULBL[t], why: '' })).join(' ')} &middot; số thứ tự bên trái là thứ tự nên làm; chạm vào nhãn để xem lý do.</div></div>` : ''}
       <div class="card">${p.blocks.length ? p.blocks.map(b => `<div class="row" style="display:flex;gap:10px;align-items:center;padding:8px 12px">
         ${b.kind === 'fixed' ? '<span style="min-width:24px"></span>' : `<span class="pill" style="min-width:24px;text-align:center;font-weight:700">${rank(b)}</span>`}<b style="min-width:92px">${b.start}-${b.end}</b>
-        <div style="flex:1;min-width:0">${ubadge(b.urg)} ${E(b.title)}${b.tentative ? ' <span class="mut">(thời lượng tạm)</span>' : ''}${b.partial ? ' <span class="mut">(làm một phần)</span>' : ''}${b.overdue ? ' <span class="late">quá hạn</span>' : ''}<div class="mut">${E(grpName(b.grp))}${b.urg ? ' · ' + E(b.urg.why) : (b.due ? ' · hạn ' + fd(b.due) : '')}</div></div>
+        <div style="flex:1;min-width:0">${ubadge(b.urg)} ${E(b.title)}${b.tentative ? ' <span class="mut">(thời lượng tạm)</span>' : ''}${b.partial ? ' <span class="mut">(làm một phần)</span>' : ''}${b.pinned ? ' <span class="mut">(giờ chị đặt)</span>' : ''}${b.overdue ? ' <span class="late">quá hạn</span>' : ''}<div class="mut">${E(grpName(b.grp))}${b.urg ? ' · ' + E(b.urg.why) : (b.due ? ' · hạn ' + fd(b.due) : '')}${b.due_time ? ' · <b>phải xong lúc ' + E(b.due_time) + (b.due_date && b.due_date !== td ? ' ' + fd(b.due_date) : '') + '</b>' : ''}</div></div>
         ${b.kind === 'task' ? `<button class="btn sm" onclick="Tracey.set('${E(b.key)}','done')">Xong</button>` : b.kind === 'adhoc' ? `<button class="btn sm" onclick="Tracey.adhocDone('${E(b.key)}')">Xong</button>` : ''}</div>`).join('') : '<div class="empty">Không có việc nào trong khung giờ hôm nay</div>'}</div>
       <div class="sec"><span>Giờ tắt máy hôm nay</span></div>
       <div class="card pad"><input type="time" id="trEnd" value="${E(endRow)}"> <button class="btn sm" onclick="Tracey.saveEnd()">Lưu</button> <span class="mut">Dùng làm số liệu làm thêm giờ cho báo cáo.</span></div>
@@ -180,6 +186,13 @@ const Tracey = (() => {
             ${t.approver ? `<div class="mut">Duyệt: ${E(t.approver)}${t.output ? ' · Gửi: ' + E(t.output) : ''}</div>` : ''}
             ${steps.map((s, i) => `<label style="display:block;margin:3px 0"><input type="checkbox" ${sd.includes(String(i)) ? 'checked' : ''} onchange="Tracey.step('${E(x.key)}',${i},this.checked)"> ${E(s)}</label>`).join('')}
             ${t.note ? `<div class="mut" style="margin-top:4px">Ghi chú: ${E(t.note)}</div>` : ''}
+            <div class="mut" style="margin-top:8px"><b>Giờ riêng cho lần này</b> (tùy chọn): hệ thống nhắc qua Zalo theo các giờ chị đặt.</div>
+            <div class="two"><label class="f">Phải xong - ngày<input type="date" value="${E(x.due)}" onchange="Tracey.timing('${E(x.key)}','due_date',this.value)"></label>
+              <label class="f">Phải xong - giờ<input type="time" value="${E(x.due_time)}" onchange="Tracey.timing('${E(x.key)}','due_time',this.value)"></label></div>
+            <label class="f">Nhắc trước deadline${remSel(`onchange="Tracey.timing('${E(x.key)}','remind_due',this.value)"`, x.remind_due)}</label>
+            <div class="two"><label class="f">Ngày bắt đầu làm<input type="date" value="${E(x.start_date || x.from)}" onchange="Tracey.timing('${E(x.key)}','start_date',this.value)"></label>
+              <label class="f">Giờ bắt đầu làm<input type="time" value="${E(x.start_time)}" onchange="Tracey.timing('${E(x.key)}','start_time',this.value)"></label></div>
+            <label class="f">Nhắc trước giờ bắt đầu${remSel(`onchange="Tracey.timing('${E(x.key)}','remind_start',this.value)"`, x.remind_start)}</label>
             <div class="actions" style="margin-top:8px"><button class="btn sm p" onclick="Tracey.set('${E(x.key)}','${NEXT[x.status]}')">→ ${ST[NEXT[x.status]]}</button>
               <button class="btn sm" onclick="Tracey.set('${E(x.key)}','skip')">Bỏ qua</button>
               <label class="mut">Thực tế (phút) <input type="number" min="0" style="width:80px" value="${x.actual_min || ''}" onchange="Tracey.actual('${E(x.key)}',this.value)"></label></div>
@@ -190,12 +203,16 @@ const Tracey = (() => {
   function adhoc() {
     const d = S.d, cats = d.cats;
     const open = d.adhoc.filter(a => a.status === 'open'), back = d.adhoc.filter(a => a.status === 'backlog'), done = d.adhoc.filter(a => a.status === 'done');
-    const row = a => `<div class="row" style="display:flex;gap:8px;align-items:center;padding:8px 12px"><div style="flex:1">${E(a.title)} ${Number(a.urgent) ? '<span class="late">gấp</span>' : ''}<div class="mut">${fd(a.date)} · ${E(cats[a.cat] || a.cat)}${a.minutes ? ' · ' + a.minutes + ' phút' : ''}${a.requester ? ' · ' + E(a.requester) : ''}</div></div>
+    const row = a => `<div class="row" style="display:flex;gap:8px;align-items:center;padding:8px 12px"><div style="flex:1">${E(a.title)} ${Number(a.urgent) ? '<span class="late">gấp</span>' : ''}<div class="mut">${fd(a.date)} · ${E(cats[a.cat] || a.cat)}${a.minutes ? ' · ' + a.minutes + ' phút' : ''}${a.requester ? ' · ' + E(a.requester) : ''}${tmv(a.start_time) ? ' · bắt đầu ' + tmv(a.start_time) + ' (nhắc trước ' + remTxt(a.remind_start) + ')' : ''}${tmv(a.due_time) ? ' · phải xong ' + tmv(a.due_time) + (dv(a.due_date) && dv(a.due_date) !== dv(a.date) ? ' ' + fd(dv(a.due_date)) : '') + ' (nhắc trước ' + remTxt(a.remind_due) + ')' : ''}</div></div>
       ${a.status === 'open' ? `<button class="btn sm" onclick="Tracey.adhocDone('${E(a.id)}')">Xong</button>` : a.status === 'backlog' ? `<button class="btn sm" onclick="Tracey.adhocPromote('${E(a.id)}')">Làm hôm nay</button>` : ''}<button class="btn sm ghost" onclick="Tracey.adhocDel('${E(a.id)}')">✕</button></div>`;
     return `<div class="card pad"><div class="sec" style="margin-top:0"><span>Ghi nhanh việc chen ngang</span></div>
       <div class="form"><input id="adT" placeholder="Việc gì? (không ghi tên khách/số tiền)" maxlength="120">
       <div class="two"><select id="adC">${Object.keys(cats).map(k => `<option value="${k}">${E(cats[k])}</option>`).join('')}</select><input id="adM" type="number" min="0" placeholder="Dự kiến (phút)"></div>
       <div class="two"><input id="adR" placeholder="Ai nhờ (mã, vd NV-01)" maxlength="20"><label><input type="checkbox" id="adU"> Gấp</label></div>
+      <div class="mut" style="margin-top:6px">Giờ làm và deadline (tùy chọn). Hệ thống khóa đúng giờ bắt đầu trong kế hoạch và nhắc qua Zalo trước giờ đó.</div>
+      <div class="two"><label class="f">Giờ bắt đầu làm<input type="time" id="adS"></label><label class="f">Nhắc trước giờ bắt đầu${remSel('id="adRS"', 60)}</label></div>
+      <div class="two"><label class="f">Phải xong - ngày (bỏ trống = cùng ngày)<input type="date" id="adDd"></label><label class="f">Phải xong - giờ<input type="time" id="adDt"></label></div>
+      <label class="f">Nhắc trước deadline${remSel('id="adRD"', 60)}</label>
       <div class="actions"><button class="btn p" onclick="Tracey.adhocAdd()">Thêm</button></div></div></div>
       <div class="sec"><span>Đang mở (${open.length})</span></div><div class="card">${open.map(row).join('') || '<div class="empty">Không có</div>'}</div>
       <div class="sec"><span>Tồn đọng, chưa xếp lịch (${back.length})</span></div><div class="card">${back.map(row).join('') || '<div class="empty">Không có</div>'}</div>
@@ -278,7 +295,7 @@ const Tracey = (() => {
   const val = id => (document.getElementById(id) || {}).value;
   return {
     mount, toast, logout, connect,
-    go(t) { S.tab = t; paint(); },
+    go(t) { S.tab = t; if (S.dirty) { S.dirty = false; load(); } else paint(); },
     reload() { load(); },
     nav(n) { const m = S.month || S.d.month; const p = m.split('-').map(Number); const dt = n === 0 ? new Date() : new Date(p[0], p[1] - 1 + n, 1); const ym = dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2); S.report = null; load(ym); },
     set(key, status) { act({ action: 'setStatus', key, status }); },
@@ -289,7 +306,17 @@ const Tracey = (() => {
       x.steps_done = nx.join(','); api({ action: 'setStatus', key, steps_done: x.steps_done }).catch(e => toast('Lỗi: ' + e.message));
     },
     saveEnd() { const v = val('trEnd'); if (!v) return; act({ action: 'setEnd', date: S.d.today, end_time: v }, 'Đã lưu'); },
-    adhocAdd() { const t = (val('adT') || '').trim(); if (!t) { toast('Nhập tên việc'); return; } act({ action: 'addAdhoc', title: t, cat: val('adC'), minutes: val('adM'), requester: val('adR'), urgent: document.getElementById('adU').checked }, 'Đã thêm'); },
+    adhocAdd() {
+      const t = (val('adT') || '').trim(); if (!t) { toast('Nhập tên việc'); return; }
+      act({ action: 'addAdhoc', title: t, cat: val('adC'), minutes: val('adM'), requester: val('adR'), urgent: document.getElementById('adU').checked,
+        start_time: val('adS') || '', remind_start: val('adRS'), due_date: val('adDd') || '', due_time: val('adDt') || '', remind_due: val('adRD') }, 'Đã thêm');
+    },
+    // Đặt giờ bắt đầu / deadline / nhắc trước cho một việc theo lịch mẫu (lần này). Lưu ngay; kế hoạch tính lại khi mở tab khác.
+    timing(key, field, v) {
+      const x = S.d.instances.find(z => z.key === key); if (x) x[field] = v;
+      S.dirty = true;
+      api({ action: 'setStatus', key, [field]: v }).then(() => toast('Đã lưu')).catch(e => toast('Lỗi: ' + e.message));
+    },
     adhocPromote(id) { act({ action: 'updateAdhoc', id, status: 'open', date: S.d.today }, 'Đã đưa vào hôm nay'); },
     adhocDone(id) { act({ action: 'updateAdhoc', id, status: 'done' }); },
     adhocDel(id) { if (confirm('Xóa việc này?')) act({ action: 'deleteAdhoc', id }); },
