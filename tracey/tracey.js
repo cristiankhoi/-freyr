@@ -209,7 +209,7 @@ const Tracey = (() => {
       <div class="form" style="grid-template-columns:minmax(0,1fr)"><input id="adT" placeholder="Việc gì? (không ghi tên khách/số tiền)" maxlength="120">
       <div class="two"><select id="adC">${Object.keys(cats).map(k => `<option value="${k}">${E(cats[k])}</option>`).join('')}</select><input id="adM" type="number" min="0" placeholder="Dự kiến (phút)"></div>
       <div class="two"><input id="adR" placeholder="Ai nhờ (mã, vd NV-01)" maxlength="20"><label><input type="checkbox" id="adU"> Gấp</label></div>
-      <div class="mut" style="margin-top:6px">Giờ làm và deadline (tùy chọn). Hệ thống khóa đúng giờ bắt đầu trong kế hoạch và nhắc qua Zalo trước giờ đó.</div>
+      <div class="mut" style="margin-top:6px">Giờ làm và deadline (tùy chọn). Chị không điền thì hệ thống vẫn tự nhắc qua Zalo: 1 giờ trước giờ làm theo kế hoạch và 1 giờ trước hết giờ làm (18:00). Điền giờ riêng thì nhắc theo giờ đó.</div>
       <div class="two"><label class="f">Giờ bắt đầu làm<input type="time" id="adS"></label><label class="f">Nhắc trước giờ bắt đầu${remSel('id="adRS"', 60)}</label></div>
       <div class="two"><label class="f">Phải xong - ngày (bỏ trống = cùng ngày)<input type="date" id="adDd"></label><label class="f">Phải xong - giờ<input type="time" id="adDt"></label></div>
       <label class="f">Nhắc trước deadline${remSel('id="adRD"', 60)}</label>
