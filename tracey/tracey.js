@@ -20,7 +20,7 @@ const Tracey = (() => {
   const tmv = v => { const m = String(v || '').match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*$/); return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : ''; };
   const dv = v => { const s = String(v || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; };
   const REM = [[0, 'Không nhắc'], [15, '15 phút'], [30, '30 phút'], [60, '1 giờ'], [120, '2 giờ'], [1440, '1 ngày']];
-  const remTxt = m => { const r = REM.find(z => z[0] === Number(m)); return r ? r[1] : (Number(m) ? m + ' phút' : 'không nhắc'); };
+  const remTxt = m => { if (m === '' || m === undefined || m === null) m = 60; const r = REM.find(z => z[0] === Number(m)); return r ? r[1] : (Number(m) ? m + ' phút' : 'không nhắc'); };   // để trống = mặc định 1 giờ
   const remSel = (attrs, cur) => `<select ${attrs}>${REM.map(r => `<option value="${r[0]}" ${r[0] === Number(cur) ? 'selected' : ''}>${r[1]}</option>`).join('')}</select>`;
 
   /* ---- gọi máy chủ ---- */
